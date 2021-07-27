@@ -1,0 +1,22 @@
+[
+    {
+        "name":  "displayName",
+        "value":  "{{form.gridMailbox.displayName}}"
+    },
+    {
+        "name":  "NewEMailAddress",
+        "value":  "{{form.newEmailResult.NewEMailAddress}}"
+    },
+    {
+        "name":  "DistinguishedName",
+        "value":  "{{form.gridMailbox.DistinguishedName}}"
+    },
+    {
+        "name":  "Alias",
+        "value":  "{{form.gridMailbox.Alias}}"
+    },
+    {
+        "name":  "UserPrincipalName",
+        "value":  "{{form.gridMailbox.UserPrincipalName}}"
+    }
+]
