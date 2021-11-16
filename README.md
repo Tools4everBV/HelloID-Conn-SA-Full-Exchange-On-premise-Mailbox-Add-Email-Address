@@ -1,5 +1,3 @@
-# HelloID-Conn-SA-Full-Exchange-On-premise-Mailbox-Add-Email-Address
-
 <!-- Description -->
 ## Description
 This HelloID Service Automation Delegated Form provides the functionality to add an extra emailaddress to a mailbox. The following options are available:
@@ -7,6 +5,12 @@ This HelloID Service Automation Delegated Form provides the functionality to add
  2. The result will show you a list of mailboxes. You will need to select to correct one
  3. Enter the new email address you want to add,
  4. The Delegated Form verfiy if the email address is unique or it will find a unique address
+
+## Versioning
+| Version | Description | Date |
+| - | - | - |
+| 1.0.1   | Added version number and updated all-in-one script | 2021/11/16  |
+| 1.0.0   | Initial release | 2021/04/29  |
 
 <!-- TABLE OF CONTENTS -->
 ## Table of Contents
@@ -49,5 +53,8 @@ This Powershell data source runs a query to search all existing emailaddress to 
 ### Delegated form task '[Exchange-mailbox-add-email-address'
 This delegated form task adds the new Email Address to the mailbox
 
-# HelloID Docs
+## Getting help
+_If you need help, feel free to ask questions on our [forum](https://forum.helloid.com/forum/helloid-connectors/service-automation/584-helloid-sa-exchange-on-premises-add-e-mail-address-to-mailbox)_
+
+## HelloID Docs
 The official HelloID documentation can be found at: https://docs.helloid.com/

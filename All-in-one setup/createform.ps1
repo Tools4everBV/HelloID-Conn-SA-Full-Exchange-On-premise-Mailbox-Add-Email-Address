@@ -6,8 +6,8 @@
 $portalUrl = "https://CUSTOMER.helloid.com"
 $apiKey = "API_KEY"
 $apiSecret = "API_SECRET"
-$delegatedFormAccessGroupNames = @("Users","HID_administrators") #Only unique names are supported. Groups must exist!
-$delegatedFormCategories = @("Active Directory","User Management") #Only unique names are supported. Categories will be created if not exists
+$delegatedFormAccessGroupNames = @("Users") #Only unique names are supported. Groups must exist!
+$delegatedFormCategories = @("Exchange On-Premise","Exchange Online") #Only unique names are supported. Categories will be created if not exists
 $script:debugLogging = $false #Default value: $false. If $true, the HelloID resource GUIDs will be shown in the logging
 $script:duplicateForm = $false #Default value: $false. If $true, the HelloID resource names will be changed to import a duplicate Form
 $script:duplicateFormSuffix = "_tmp" #the suffix will be added to all HelloID resource names to generate a duplicate form with different resource names
@@ -16,30 +16,29 @@ $script:duplicateFormSuffix = "_tmp" #the suffix will be added to all HelloID re
 #NOTE: You can also update the HelloID Global variable values afterwards in the HelloID Admin Portal: https://<CUSTOMER>.helloid.com/admin/variablelibrary
 $globalHelloIDVariables = [System.Collections.Generic.List[object]]@();
 
-#Global variable #1 >> ExchangeAdminUsername
+#Global variable #1 >> exchangeAdminPassword
 $tmpName = @'
-ExchangeAdminUsername
-'@
-$tmpValue = @'
-Example@tools.com
-'@
-$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
-
-#Global variable #2 >> ExchangeAdminPassword
-$tmpName = @'
-ExchangeAdminPassword
-'@
-$tmpValue = ""
+exchangeAdminPassword
+'@ 
+$tmpValue = "" 
 $globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "True"});
+
+#Global variable #2 >> exchangeAdminUsername
+$tmpName = @'
+exchangeAdminUsername
+'@ 
+$tmpValue = @'
+TestAdmin@freque.nl
+'@ 
+$globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
 
 #Global variable #3 >> ExchangeConnectionUri
 $tmpName = @'
 ExchangeConnectionUri
-'@
-$tmpValue = @'
-http://ExchangeServer/powershell
-'@
+'@ 
+$tmpValue = "" 
 $globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
+
 
 #make sure write-information logging is visual
 $InformationPreference = "continue"
@@ -68,8 +67,19 @@ if (-not [string]::IsNullOrEmpty($portalBaseUrl)) {
 }
 
 # Define specific endpoint URI
-$script:PortalBaseUrl = $script:PortalBaseUrl.trim("/") + "/"
+$script:PortalBaseUrl = $script:PortalBaseUrl.trim("/") + "/"  
 
+# Make sure to reveive an empty array using PowerShell Core
+function ConvertFrom-Json-WithEmptyArray([string]$jsonString) {
+    # Running in PowerShell Core?
+    if($IsCoreCLR -eq $true){
+        $r = [Object[]]($jsonString | ConvertFrom-Json -NoEnumerate)
+        return ,$r  # Force return value to be an array using a comma
+    } else {
+        $r = [Object[]]($jsonString | ConvertFrom-Json)
+        return ,$r  # Force return value to be an array using a comma
+    }
+}
 
 function Invoke-HelloIDGlobalVariable {
     param(
@@ -83,7 +93,7 @@ function Invoke-HelloIDGlobalVariable {
     try {
         $uri = ($script:PortalBaseUrl + "api/v1/automation/variables/named/$Name")
         $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
-
+    
         if ([string]::IsNullOrEmpty($response.automationVariableGuid)) {
             #Create Variable
             $body = @{
@@ -91,9 +101,9 @@ function Invoke-HelloIDGlobalVariable {
                 value    = $Value;
                 secret   = $Secret;
                 ItemType = 0;
-            }
+            }    
             $body = ConvertTo-Json -InputObject $body
-
+    
             $uri = ($script:PortalBaseUrl + "api/v1/automation/variable")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
             $variableGuid = $response.automationVariableGuid
@@ -119,14 +129,14 @@ function Invoke-HelloIDAutomationTask {
         [parameter()][String][AllowEmptyString()]$ForceCreateTask,
         [parameter(Mandatory)][Ref]$returnObject
     )
-
+    
     $TaskName = $TaskName + $(if ($script:duplicateForm -eq $true) { $script:duplicateFormSuffix })
 
     try {
         $uri = ($script:PortalBaseUrl +"api/v1/automationtasks?search=$TaskName&container=$AutomationContainer")
-        $responseRaw = (Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false)
+        $responseRaw = (Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false) 
         $response = $responseRaw | Where-Object -filter {$_.name -eq $TaskName}
-
+    
         if([string]::IsNullOrEmpty($response.automationTaskGuid) -or $ForceCreateTask -eq $true) {
             #Create Task
 
@@ -136,10 +146,10 @@ function Invoke-HelloIDAutomationTask {
                 powerShellScript    = $PowershellScript;
                 automationContainer = $AutomationContainer;
                 objectGuid          = $ObjectGuid;
-                variables           = [Object[]]($Variables | ConvertFrom-Json);
+                variables           = (ConvertFrom-Json-WithEmptyArray($Variables));
             }
             $body = ConvertTo-Json -InputObject $body
-
+    
             $uri = ($script:PortalBaseUrl +"api/v1/automationtasks/powershell")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
             $taskGuid = $response.automationTaskGuid
@@ -163,7 +173,7 @@ function Invoke-HelloIDDatasource {
         [parameter(Mandatory)][String]$DatasourceType,
         [parameter(Mandatory)][String][AllowEmptyString()]$DatasourceModel,
         [parameter()][String][AllowEmptyString()]$DatasourceStaticValue,
-        [parameter()][String][AllowEmptyString()]$DatasourcePsScript,
+        [parameter()][String][AllowEmptyString()]$DatasourcePsScript,        
         [parameter()][String][AllowEmptyString()]$DatasourceInput,
         [parameter()][String][AllowEmptyString()]$AutomationTaskGuid,
         [parameter(Mandatory)][Ref]$returnObject
@@ -171,33 +181,33 @@ function Invoke-HelloIDDatasource {
 
     $DatasourceName = $DatasourceName + $(if ($script:duplicateForm -eq $true) { $script:duplicateFormSuffix })
 
-    $datasourceTypeName = switch($DatasourceType) {
-        "1" { "Native data source"; break}
-        "2" { "Static data source"; break}
-        "3" { "Task data source"; break}
+    $datasourceTypeName = switch($DatasourceType) { 
+        "1" { "Native data source"; break} 
+        "2" { "Static data source"; break} 
+        "3" { "Task data source"; break} 
         "4" { "Powershell data source"; break}
     }
-
+    
     try {
         $uri = ($script:PortalBaseUrl +"api/v1/datasource/named/$DatasourceName")
         $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
-
+      
         if([string]::IsNullOrEmpty($response.dataSourceGUID)) {
             #Create DataSource
             $body = @{
                 name               = $DatasourceName;
                 type               = $DatasourceType;
-                model              = [Object[]]($DatasourceModel | ConvertFrom-Json);
+                model              = (ConvertFrom-Json-WithEmptyArray($DatasourceModel));
                 automationTaskGUID = $AutomationTaskGuid;
-                value              = [Object[]]($DatasourceStaticValue | ConvertFrom-Json);
+                value              = (ConvertFrom-Json-WithEmptyArray($DatasourceStaticValue));
                 script             = $DatasourcePsScript;
-                input              = [Object[]]($DatasourceInput | ConvertFrom-Json);
+                input              = (ConvertFrom-Json-WithEmptyArray($DatasourceInput));
             }
             $body = ConvertTo-Json -InputObject $body
-
+      
             $uri = ($script:PortalBaseUrl +"api/v1/datasource")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
-
+              
             $datasourceGuid = $response.dataSourceGUID
             Write-Information "$datasourceTypeName '$DatasourceName' created$(if ($script:debugLogging -eq $true) { ": " + $datasourceGuid })"
         } else {
@@ -218,7 +228,7 @@ function Invoke-HelloIDDynamicForm {
         [parameter(Mandatory)][String]$FormSchema,
         [parameter(Mandatory)][Ref]$returnObject
     )
-
+    
     $FormName = $FormName + $(if ($script:duplicateForm -eq $true) { $script:duplicateFormSuffix })
 
     try {
@@ -228,18 +238,18 @@ function Invoke-HelloIDDynamicForm {
         } catch {
             $response = $null
         }
-
+    
         if(([string]::IsNullOrEmpty($response.dynamicFormGUID)) -or ($response.isUpdated -eq $true)) {
             #Create Dynamic form
             $body = @{
                 Name       = $FormName;
-                FormSchema = [Object[]]($FormSchema | ConvertFrom-Json)
+                FormSchema = (ConvertFrom-Json-WithEmptyArray($FormSchema));
             }
             $body = ConvertTo-Json -InputObject $body -Depth 100
-
+    
             $uri = ($script:PortalBaseUrl +"api/v1/forms")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
-
+    
             $formGuid = $response.dynamicFormGUID
             Write-Information "Dynamic form '$formName' created$(if ($script:debugLogging -eq $true) { ": " + $formGuid })"
         } else {
@@ -274,22 +284,22 @@ function Invoke-HelloIDDelegatedForm {
         } catch {
             $response = $null
         }
-
+    
         if([string]::IsNullOrEmpty($response.delegatedFormGUID)) {
             #Create DelegatedForm
             $body = @{
                 name            = $DelegatedFormName;
                 dynamicFormGUID = $DynamicFormGuid;
                 isEnabled       = "True";
-                accessGroups    = [Object[]]($AccessGroups | ConvertFrom-Json);
+                accessGroups    = (ConvertFrom-Json-WithEmptyArray($AccessGroups));
                 useFaIcon       = $UseFaIcon;
                 faIcon          = $FaIcon;
-            }
+            }    
             $body = ConvertTo-Json -InputObject $body
-
+    
             $uri = ($script:PortalBaseUrl +"api/v1/delegatedforms")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
-
+    
             $delegatedFormGuid = $response.delegatedFormGUID
             Write-Information "Delegated form '$DelegatedFormName' created$(if ($script:debugLogging -eq $true) { ": " + $delegatedFormGuid })"
             $delegatedFormCreated = $true
@@ -312,7 +322,7 @@ function Invoke-HelloIDDelegatedForm {
 }
 <# Begin: HelloID Global Variables #>
 foreach ($item in $globalHelloIDVariables) {
-	Invoke-HelloIDGlobalVariable -Name $item.name -Value $item.value -Secret $item.secret
+	Invoke-HelloIDGlobalVariable -Name $item.name -Value $item.value -Secret $item.secret 
 }
 <# End: HelloID Global Variables #>
 
@@ -399,18 +409,18 @@ try {
 }
 <#----- Exchange On-Premises: End -----#>
 
-'@
+'@ 
 $tmpModel = @'
 [{"key":"NewEMailAddress","type":0}]
-'@
+'@ 
 $tmpInput = @'
 [{"description":null,"translateDescription":false,"inputFieldType":1,"key":"newEmail","type":0,"options":0}]
-'@
-$dataSourceGuid_1 = [PSCustomObject]@{}
+'@ 
+$dataSourceGuid_1 = [PSCustomObject]@{} 
 $dataSourceGuid_1_Name = @'
 Exchange-mailbox-add-email-address-validate-address
-'@
-Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_1_Name -DatasourceType "4" -DatasourceInput $tmpInput -DatasourcePsScript $tmpPsScript -DatasourceModel $tmpModel -returnObject ([Ref]$dataSourceGuid_1)
+'@ 
+Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_1_Name -DatasourceType "4" -DatasourceInput $tmpInput -DatasourcePsScript $tmpPsScript -DatasourceModel $tmpModel -returnObject ([Ref]$dataSourceGuid_1) 
 <# End: DataSource "Exchange-mailbox-add-email-address-validate-address" #>
 
 <# Begin: DataSource "Exchange-mailbox-add-email-address-get-mailbox" #>
@@ -476,31 +486,31 @@ try {
 }
 <#----- Exchange On-Premises: End -----#>
 
-'@
+'@ 
 $tmpModel = @'
 [{"key":"Alias","type":0},{"key":"UserPrincipalName","type":0},{"key":"displayName","type":0},{"key":"DistinguishedName","type":0}]
-'@
+'@ 
 $tmpInput = @'
 [{"description":null,"translateDescription":false,"inputFieldType":1,"key":"searchMailbox","type":0,"options":1}]
-'@
-$dataSourceGuid_0 = [PSCustomObject]@{}
+'@ 
+$dataSourceGuid_0 = [PSCustomObject]@{} 
 $dataSourceGuid_0_Name = @'
 Exchange-mailbox-add-email-address-get-mailbox
-'@
-Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_0_Name -DatasourceType "4" -DatasourceInput $tmpInput -DatasourcePsScript $tmpPsScript -DatasourceModel $tmpModel -returnObject ([Ref]$dataSourceGuid_0)
+'@ 
+Invoke-HelloIDDatasource -DatasourceName $dataSourceGuid_0_Name -DatasourceType "4" -DatasourceInput $tmpInput -DatasourcePsScript $tmpPsScript -DatasourceModel $tmpModel -returnObject ([Ref]$dataSourceGuid_0) 
 <# End: DataSource "Exchange-mailbox-add-email-address-get-mailbox" #>
 <# End: HelloID Data sources #>
 
 <# Begin: Dynamic Form "Exchange on-premise - Mailbox add email address" #>
 $tmpSchema = @"
-[{"label":"Details","fields":[{"key":"searchMailbox","templateOptions":{"label":"Search MailBox","placeholder":"","required":true},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"gridMailbox","templateOptions":{"label":"Mailbox","required":true,"grid":{"columns":[{"headerName":"Alias","field":"Alias"},{"headerName":"User Principal Name","field":"UserPrincipalName"},{"headerName":"Display Name","field":"displayName"},{"headerName":"Distinguished Name","field":"DistinguishedName"}],"height":300,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_0","input":{"propertyInputs":[{"propertyName":"searchMailbox","otherFieldValue":{"otherFieldKey":"searchMailbox"}}]}},"useDefault":false},"type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":true}]},{"label":"NewEmail Address","fields":[{"key":"newEmail","templateOptions":{"label":"New Emailaddress","pattern":"(?:[a-z0-9!#$%\u0026\u0027*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%\u0026\u0027*+/=?^_`{|}~-]+)*|\"(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])","required":true},"validation":{"messages":{"pattern":"Invalid email address"}},"type":"email","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"newEmailResult","templateOptions":{"label":"New Email address Result","required":true,"grid":{"columns":[{"headerName":"New E Mail Address","field":"NewEMailAddress"}],"height":300,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_1","input":{"propertyInputs":[{"propertyName":"newEmail","otherFieldValue":{"otherFieldKey":"newEmail"}}]}},"useFilter":true,"useDefault":false},"type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":true}]}]
-"@
+[{"label":"Details","fields":[{"key":"searchMailbox","templateOptions":{"label":"Search MailBox","placeholder":"","required":true},"type":"input","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"gridMailbox","templateOptions":{"label":"Mailbox","required":true,"grid":{"columns":[{"headerName":"Alias","field":"Alias"},{"headerName":"User Principal Name","field":"UserPrincipalName"},{"headerName":"Display Name","field":"displayName"},{"headerName":"Distinguished Name","field":"DistinguishedName"}],"height":300,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_0","input":{"propertyInputs":[{"propertyName":"searchMailbox","otherFieldValue":{"otherFieldKey":"searchMailbox"}}]}},"useDefault":false},"type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":true}]},{"label":"NewEmail Address","fields":[{"key":"newEmail","templateOptions":{"label":"New Emailaddress","pattern":"(?:[a-z0-9!#$%\u0026\u0027*+/=?^_{|}~-]+(?:\\.[a-z0-9!#$%\u0026\u0027*+/=?^_{|}~-]+)*|\"(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\[(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?|[a-z0-9-]*[a-z0-9]:(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21-\\x5a\\x53-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])","required":true},"validation":{"messages":{"pattern":"Invalid email address"}},"type":"email","summaryVisibility":"Hide element","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"newEmailResult","templateOptions":{"label":"New Email address Result","required":true,"grid":{"columns":[{"headerName":"New E Mail Address","field":"NewEMailAddress"}],"height":300,"rowSelection":"single"},"dataSourceConfig":{"dataSourceGuid":"$dataSourceGuid_1","input":{"propertyInputs":[{"propertyName":"newEmail","otherFieldValue":{"otherFieldKey":"newEmail"}}]}},"useFilter":true,"useDefault":false},"type":"grid","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":true}]}]
+"@ 
 
-$dynamicFormGuid = [PSCustomObject]@{}
+$dynamicFormGuid = [PSCustomObject]@{} 
 $dynamicFormName = @'
 Exchange on-premise - Mailbox add email address
-'@
-Invoke-HelloIDDynamicForm -FormName $dynamicFormName -FormSchema $tmpSchema  -returnObject ([Ref]$dynamicFormGuid)
+'@ 
+Invoke-HelloIDDynamicForm -FormName $dynamicFormName -FormSchema $tmpSchema  -returnObject ([Ref]$dynamicFormGuid) 
 <# END: Dynamic Form #>
 
 <# Begin: Delegated Form Access Groups and Categories #>
@@ -511,7 +521,7 @@ foreach($group in $delegatedFormAccessGroupNames) {
         $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
         $delegatedFormAccessGroupGuid = $response.groupGuid
         $delegatedFormAccessGroupGuids += $delegatedFormAccessGroupGuid
-
+        
         Write-Information "HelloID (access)group '$group' successfully found$(if ($script:debugLogging -eq $true) { ": " + $delegatedFormAccessGroupGuid })"
     } catch {
         Write-Error "HelloID (access)group '$group', message: $_"
@@ -526,7 +536,7 @@ foreach($category in $delegatedFormCategories) {
         $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
         $tmpGuid = $response.delegatedFormCategoryGuid
         $delegatedFormCategoryGuids += $tmpGuid
-
+        
         Write-Information "HelloID Delegated Form category '$category' successfully found$(if ($script:debugLogging -eq $true) { ": " + $tmpGuid })"
     } catch {
         Write-Warning "HelloID Delegated Form category '$category' not found"
@@ -547,15 +557,15 @@ $delegatedFormCategoryGuids = (ConvertTo-Json -InputObject $delegatedFormCategor
 <# End: Delegated Form Access Groups and Categories #>
 
 <# Begin: Delegated Form #>
-$delegatedFormRef = [PSCustomObject]@{guid = $null; created = $null}
+$delegatedFormRef = [PSCustomObject]@{guid = $null; created = $null} 
 $delegatedFormName = @'
 Exchange on-premise - Mailbox add email address
 '@
-Invoke-HelloIDDelegatedForm -DelegatedFormName $delegatedFormName -DynamicFormGuid $dynamicFormGuid -AccessGroups $delegatedFormAccessGroupGuids -Categories $delegatedFormCategoryGuids -UseFaIcon "True" -FaIcon "fa fa-file-text-o" -returnObject ([Ref]$delegatedFormRef)
+Invoke-HelloIDDelegatedForm -DelegatedFormName $delegatedFormName -DynamicFormGuid $dynamicFormGuid -AccessGroups $delegatedFormAccessGroupGuids -Categories $delegatedFormCategoryGuids -UseFaIcon "True" -FaIcon "fa fa-file-text-o" -returnObject ([Ref]$delegatedFormRef) 
 <# End: Delegated Form #>
 
 <# Begin: Delegated Form Task #>
-if($delegatedFormRef.created -eq $true) {
+if($delegatedFormRef.created -eq $true) { 
 	$tmpScript = @'
 <#-----[task]_Exchange-mailbox-add-email-address-----#>
 # Connect to Exchange
@@ -607,18 +617,18 @@ try {
 }
 <#----- Exchange On-Premises: End -----#>
 
-'@;
+'@; 
 
 	$tmpVariables = @'
-[{"name":"displayName","value":"{{form.gridMailbox.displayName}}","secret":false,"typeConstraint":"string"},{"name":"NewEMailAddress","value":"{{form.newEmailResult.NewEMailAddress}}","secret":false,"typeConstraint":"string"},{"name":"DistinguishedName","value":"{{form.gridMailbox.DistinguishedName}}","secret":false,"typeConstraint":"string"},{"name":"Alias","value":"{{form.gridMailbox.Alias}}","secret":false,"typeConstraint":"string"},{"name":"UserPrincipalName","value":"{{form.gridMailbox.UserPrincipalName}}","secret":false,"typeConstraint":"string"}]
-'@
+[{"name":"Alias","value":"{{form.gridMailbox.Alias}}","secret":false,"typeConstraint":"string"},{"name":"displayName","value":"{{form.gridMailbox.displayName}}","secret":false,"typeConstraint":"string"},{"name":"DistinguishedName","value":"{{form.gridMailbox.DistinguishedName}}","secret":false,"typeConstraint":"string"},{"name":"NewEMailAddress","value":"{{form.newEmailResult.NewEMailAddress}}","secret":false,"typeConstraint":"string"},{"name":"UserPrincipalName","value":"{{form.gridMailbox.UserPrincipalName}}","secret":false,"typeConstraint":"string"}]
+'@ 
 
-	$delegatedFormTaskGuid = [PSCustomObject]@{}
+	$delegatedFormTaskGuid = [PSCustomObject]@{} 
 $delegatedFormTaskName = @'
 Exchange-mailbox-add-email-address
 '@
-	Invoke-HelloIDAutomationTask -TaskName $delegatedFormTaskName -UseTemplate "False" -AutomationContainer "8" -Variables $tmpVariables -PowershellScript $tmpScript -ObjectGuid $delegatedFormRef.guid -ForceCreateTask $true -returnObject ([Ref]$delegatedFormTaskGuid)
+	Invoke-HelloIDAutomationTask -TaskName $delegatedFormTaskName -UseTemplate "False" -AutomationContainer "8" -Variables $tmpVariables -PowershellScript $tmpScript -ObjectGuid $delegatedFormRef.guid -ForceCreateTask $true -returnObject ([Ref]$delegatedFormTaskGuid) 
 } else {
-	Write-Warning "Delegated form '$delegatedFormName' already exists. Nothing to do with the Delegated Form task..."
+	Write-Warning "Delegated form '$delegatedFormName' already exists. Nothing to do with the Delegated Form task..." 
 }
 <# End: Delegated Form Task #>

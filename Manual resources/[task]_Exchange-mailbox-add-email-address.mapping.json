@@ -1,19 +1,19 @@
 [
     {
-        "name":  "displayName",
-        "value":  "{{form.gridMailbox.displayName}}"
+        "name":  "Alias",
+        "value":  "{{form.gridMailbox.Alias}}"
     },
     {
-        "name":  "NewEMailAddress",
-        "value":  "{{form.newEmailResult.NewEMailAddress}}"
+        "name":  "displayName",
+        "value":  "{{form.gridMailbox.displayName}}"
     },
     {
         "name":  "DistinguishedName",
         "value":  "{{form.gridMailbox.DistinguishedName}}"
     },
     {
-        "name":  "Alias",
-        "value":  "{{form.gridMailbox.Alias}}"
+        "name":  "NewEMailAddress",
+        "value":  "{{form.newEmailResult.NewEMailAddress}}"
     },
     {
         "name":  "UserPrincipalName",
