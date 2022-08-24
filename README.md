@@ -9,6 +9,7 @@ This HelloID Service Automation Delegated Form provides the functionality to add
 ## Versioning
 | Version | Description | Date |
 | - | - | - |
+| 1.0.2   | Added version number and updated code for SA-agent and auditlogging | 2022/08/24  |
 | 1.0.1   | Added version number and updated all-in-one script | 2021/11/16  |
 | 1.0.0   | Initial release | 2021/04/29  |
 
@@ -50,7 +51,7 @@ This Powershell data source runs a query to search for the mailbox.
 ### Powershell data source 'Exchange-mailbox-add-email-address-validate-address'
 This Powershell data source runs a query to search all existing emailaddress to verify the new emailaddress
 
-### Delegated form task '[Exchange-mailbox-add-email-address'
+### Delegated form task 'Exchange on-premise - Mailbox add email address'
 This delegated form task adds the new Email Address to the mailbox
 
 ## Getting help
